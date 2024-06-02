@@ -1,0 +1,81 @@
+#!/usr/bin/env node
+
+const { google } = require('googleapis');
+const ytdl = require('ytdl-core');
+const ffmpeg = require('fluent-ffmpeg');
+const fs = require('fs');
+const path = require('path');
+
+// Set your YouTube Data API key here
+const apiKey = 'AIzaSyCv70WgCILSjCwQIKv2ppEhZgQnavC8p6w';
+let title='';
+function getYouTubeLinks(apiKey, searchQueries) {
+    const youtube = google.youtube({
+        version: 'v3',
+        auth: apiKey
+    });
+
+    const promises = searchQueries.map(query => {
+        return youtube.search.list({
+            part: 'snippet',
+            q: query,
+            type: 'video',
+            maxResults: 1
+        }).then(response => {
+            if (response.data.items.length > 0) {
+                const videoId = response.data.items[0].id.videoId;
+                title = response.data.items[0].snippet.title;
+                console.log(title)
+                const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+                return { query, videoUrl };
+            } else {
+                return { query, videoUrl: 'No results found' };
+            }
+        });
+    });
+
+    return Promise.all(promises);
+}
+
+function downloadYouTubeAsMp3(youtubeUrl, outputDir) {
+    return new Promise((resolve, reject) => {
+        const stream = ytdl(youtubeUrl, { filter: 'audioonly' });
+        // const outputFilePath = path.join(outputDir, `${new Date().getTime()}.mp3`);
+        const outputFilePath = path.join(outputDir, `${title}.mp3`);
+
+        ffmpeg(stream)
+            .audioBitrate(320)
+            .save(outputFilePath)
+            .on('end', () => resolve(outputFilePath))
+            .on('error', reject);
+    });
+}
+
+(async () => {
+    const songs = process.argv.length > 2 ? process.argv.slice(2) : [await new Promise(resolve => {
+        process.stdout.write('Enter the song name: ');
+        process.stdin.on('data', data => resolve(data.toString().trim()));
+    })];
+
+    // Output directory for downloaded MP3 files
+    const outputDirectory =  process.cwd();
+
+    // Get YouTube video links for the songs
+    const links = await getYouTubeLinks(apiKey, songs);
+
+    for (const { query, videoUrl } of links) {
+        if (videoUrl !== 'No results found') {
+            try {
+                await downloadYouTubeAsMp3(videoUrl, outputDirectory);
+                console.log(`Downloaded ${query}`);
+            } catch (error) {
+                console.error(`Failed to download ${query}: ${error.message}`);
+            }
+        } else {
+            console.log(`No results found for ${query}`);
+        }
+    }
+
+    // Exit the process after all downloads are completed
+    process.exit(0);
+})();
