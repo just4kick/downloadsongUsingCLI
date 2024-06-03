@@ -8,7 +8,8 @@ const path = require('path');
 
 // Set your YouTube Data API key here
 const apiKey = 'AIzaSyCv70WgCILSjCwQIKv2ppEhZgQnavC8p6w';
-let title='';
+let title = '';
+
 function getYouTubeLinks(apiKey, searchQueries) {
     const youtube = google.youtube({
         version: 'v3',
@@ -25,7 +26,7 @@ function getYouTubeLinks(apiKey, searchQueries) {
             if (response.data.items.length > 0) {
                 const videoId = response.data.items[0].id.videoId;
                 title = response.data.items[0].snippet.title;
-                console.log(title)
+                console.log(title);
                 const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
                 return { query, videoUrl };
             } else {
@@ -40,7 +41,6 @@ function getYouTubeLinks(apiKey, searchQueries) {
 function downloadYouTubeAsMp3(youtubeUrl, outputDir) {
     return new Promise((resolve, reject) => {
         const stream = ytdl(youtubeUrl, { filter: 'audioonly' });
-        // const outputFilePath = path.join(outputDir, `${new Date().getTime()}.mp3`);
         const outputFilePath = path.join(outputDir, `${title}.mp3`);
 
         ffmpeg(stream)
@@ -52,13 +52,16 @@ function downloadYouTubeAsMp3(youtubeUrl, outputDir) {
 }
 
 (async () => {
-    const songs = process.argv.length > 2 ? process.argv.slice(2) : [await new Promise(resolve => {
+    // Parse command-line arguments
+    const args = process.argv.slice(2);
+
+    const songs = args.length > 0 ? args : [await new Promise(resolve => {
         process.stdout.write('Enter the song name: ');
         process.stdin.on('data', data => resolve(data.toString().trim()));
     })];
 
     // Output directory for downloaded MP3 files
-    const outputDirectory =  process.cwd();
+    const outputDirectory = process.cwd();
 
     // Get YouTube video links for the songs
     const links = await getYouTubeLinks(apiKey, songs);
@@ -66,8 +69,8 @@ function downloadYouTubeAsMp3(youtubeUrl, outputDir) {
     for (const { query, videoUrl } of links) {
         if (videoUrl !== 'No results found') {
             try {
-                await downloadYouTubeAsMp3(videoUrl, outputDirectory);
-                console.log(`Downloaded ${query}`);
+                const outputFilePath = await downloadYouTubeAsMp3(videoUrl, outputDirectory);
+                // console.log(`Downloaded ${query}`);
             } catch (error) {
                 console.error(`Failed to download ${query}: ${error.message}`);
             }
@@ -78,4 +81,5 @@ function downloadYouTubeAsMp3(youtubeUrl, outputDir) {
 
     // Exit the process after all downloads are completed
     process.exit(0);
+
 })();

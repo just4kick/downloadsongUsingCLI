@@ -1,0 +1,17 @@
+#!/bin/bash
+
+echo "Downloading $1"
+names=$(ds "$1")
+
+# if [ -z "$names" ]; then
+#   echo "Error: Failed to retrieve filename."
+#   exit 1
+# fi
+# echo "$names.mp3" > temp.txt
+
+# mpv --input-file temp.txt
+
+
+mpv "$names.mp3"
+
+rm "$names.mp3"
